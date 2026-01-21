@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FOCUS - Task Board</title>
     
+    <!-- App Icons -->
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/906/906334.png">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/906/906334.png">
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -823,6 +827,7 @@
                 <style>{GLOBAL_STYLES}</style>
                 <InstallModal isOpen={showInstallModal} onClose={() => setShowInstallModal(false)} theme={theme} text={TEXT} />
                 <ImagePreviewModal src={previewImage} isOpen={!!previewImage} onClose={() => setPreviewImage(null)} />
+                <input type="file" accept="image/*" multiple className="hidden" ref={subtaskImageInputRef} onChange={handleSubtaskImageUpload} />
                 
                 {/* --- Task Detail Modal (Center Screen) --- */}
                 {activeModalTaskId && activeTask && (
