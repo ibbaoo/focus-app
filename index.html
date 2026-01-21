@@ -827,7 +827,6 @@
                 <style>{GLOBAL_STYLES}</style>
                 <InstallModal isOpen={showInstallModal} onClose={() => setShowInstallModal(false)} theme={theme} text={TEXT} />
                 <ImagePreviewModal src={previewImage} isOpen={!!previewImage} onClose={() => setPreviewImage(null)} />
-                <input type="file" accept="image/*" multiple className="hidden" ref={subtaskImageInputRef} onChange={handleSubtaskImageUpload} />
                 
                 {/* --- Task Detail Modal (Center Screen) --- */}
                 {activeModalTaskId && activeTask && (
