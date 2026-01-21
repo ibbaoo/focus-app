@@ -250,7 +250,7 @@
                 input: { 
                     backgroundColor: isDarkMode ? '#2C2C2E' : '#E5E5EA', 
                     borderColor: 'transparent', 
-                    color: textMain,
+                    color: textMain, 
                     placeholderColor: textSec
                 },
                 modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.6)' }
@@ -340,13 +340,16 @@
         };
 
         // --- Task Modal Component (View/Edit Modes) ---
-        const TaskModal = ({ task, onClose, onUpdate, onDelete, allTags, theme }) => {
+        const TaskModal = ({ task, onClose, onUpdate, onDelete, theme }) => {
             const [mode, setMode] = useState('view'); // 'view' | 'edit'
             const [tempCategoryName, setTempCategoryName] = useState('');
             const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
             const [newSubtaskCategory, setNewSubtaskCategory] = useState('General');
             const [deleteConfirmation, setDeleteConfirmation] = useState(false);
             
+            // UI State for collapse
+            const [collapsedSections, setCollapsedSections] = useState({});
+
             // Link State
             const [newLinkUrl, setNewLinkUrl] = useState('');
             const [newLinkTitle, setNewLinkTitle] = useState('');
@@ -475,25 +478,9 @@
                                         </div>
                                     ))}
                                     
-                                    {/* Edit Mode: Tag Cloud & Add New */}
+                                    {/* Edit Mode: Add New Only (No Cloud) */}
                                     {mode === 'edit' && (
                                         <>
-                                            {/* Existing Tags Cloud */}
-                                            {allTags.filter(t => !(task.categories || []).includes(t)).map(t => (
-                                                <button 
-                                                    key={t} 
-                                                    onClick={() => toggleTag(t)} 
-                                                    className="px-4 py-2 rounded-xl text-sm font-bold border-2 border-dashed opacity-80 hover:opacity-100 hover:border-solid transition-all" 
-                                                    style={{ 
-                                                        borderColor: theme.textSec.color, 
-                                                        color: theme.textSec.color,
-                                                        backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' 
-                                                    }}
-                                                >
-                                                    + {t}
-                                                </button>
-                                            ))}
-
                                             {/* Create New Tag */}
                                             {isAddingNewCategory ? (
                                                 <div className="flex items-center gap-1 px-3 py-1.5 rounded-xl border-2 animate-slide-up" style={{ borderColor: theme.accent }}>
@@ -870,8 +857,7 @@
             ];
 
             const activeTask = tasks.find(t => t.id === activeModalTaskId);
-            const allUniqueTags = [...new Set(tasks.flatMap(t => t.categories || []))].filter(t => t !== 'General');
-
+            
             // --- RENDER ---
             if (loading) { return ( <div className={`min-h-[100dvh] flex flex-col items-center justify-center`} style={theme.appContainer}> <style>{GLOBAL_STYLES}</style> <Loader2 className="w-10 h-10 animate-spin mb-4" style={{ color: theme.accent }}/> <p className={`font-medium`} style={theme.textSec}>{TEXT.connecting}</p> </div> ); }
 
@@ -903,11 +889,11 @@
                 {/* --- Task Detail Modal (Center Screen) --- */}
                 {activeModalTaskId && activeTask && (
                     <TaskModal 
+                        key={activeTask.id}
                         task={activeTask}
                         onClose={() => setActiveModalTaskId(null)}
                         onUpdate={(updates) => setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, ...updates } : t))}
                         onDelete={() => deleteTask(activeTask.id)}
-                        allTags={allUniqueTags}
                         theme={theme}
                     />
                 )}
