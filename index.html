@@ -202,27 +202,14 @@
 
         const generateId = () => Math.random().toString(36).substr(2, 9);
 
-        // processImage removed as it's no longer used for subtasks
-        const processImage = (file) => {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX_DIM = 600; 
-                        let w = img.width;
-                        let h = img.height;
-                        if (w > h) { if (w > MAX_DIM) { h *= MAX_DIM/w; w = MAX_DIM; } } else { if (h > MAX_DIM) { w *= MAX_DIM/h; h = MAX_DIM; } }
-                        canvas.width = w; canvas.height = h;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, w, h);
-                        resolve(canvas.toDataURL('image/jpeg', 0.85));
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
+        // Helper to get local date string YYYY-MM-DD
+        const getLocalISODate = (offsetDays = 0) => {
+            const d = new Date();
+            d.setDate(d.getDate() + offsetDays);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         };
 
         const hexToRgb = (hex) => {
@@ -360,9 +347,6 @@
             const [newSubtaskCategory, setNewSubtaskCategory] = useState('General');
             const [deleteConfirmation, setDeleteConfirmation] = useState(false);
             
-            // UI State for collapse
-            const [collapsedSections, setCollapsedSections] = useState({});
-
             // Link State
             const [newLinkUrl, setNewLinkUrl] = useState('');
             const [newLinkTitle, setNewLinkTitle] = useState('');
@@ -383,7 +367,11 @@
             };
 
             const toggleSection = (sectionKey) => {
-                setCollapsedSections(prev => ({...prev, [sectionKey]: !prev[sectionKey]}));
+                const currentCollapsed = task.collapsedTags || [];
+                const newCollapsed = currentCollapsed.includes(sectionKey) 
+                    ? currentCollapsed.filter(k => k !== sectionKey)
+                    : [...currentCollapsed, sectionKey];
+                onUpdate({ collapsedTags: newCollapsed });
             };
 
             const addLink = () => {
@@ -464,8 +452,8 @@
                                 </div>
                                 {mode === 'edit' && (
                                     <div className="flex gap-2">
-                                        <button onClick={() => { const d = new Date(); onUpdate({ deadline: d.toISOString().split('T')[0] }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-opacity-10 hover:bg-opacity-20 transition-all border" style={{ backgroundColor: theme.accent, borderColor: 'transparent', color: theme.textMain.color }}>Today</button>
-                                        <button onClick={() => { const d = new Date(); d.setDate(d.getDate() + 1); onUpdate({ deadline: d.toISOString().split('T')[0] }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border hover:opacity-80" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>Tom.</button>
+                                        <button onClick={() => { onUpdate({ deadline: getLocalISODate(0) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-opacity-10 hover:bg-opacity-20 transition-all border" style={{ backgroundColor: theme.accent, borderColor: 'transparent', color: theme.textMain.color }}>Today</button>
+                                        <button onClick={() => { onUpdate({ deadline: getLocalISODate(1) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border hover:opacity-80" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>Tom.</button>
                                     </div>
                                 )}
                             </div>
@@ -527,7 +515,7 @@
                                 {(task.categories || ['General']).map(cat => {
                                     const subItems = (task.subtasks || []).filter(s => (s.category || 'General') === cat);
                                     if (subItems.length === 0 && cat === 'General') return null;
-                                    const isCollapsed = collapsedSections[`subtasks-${cat}`];
+                                    const isCollapsed = (task.collapsedTags || []).includes(`subtasks-${cat}`);
 
                                     return (
                                         <div key={cat} className="animate-slide-up">
@@ -629,7 +617,7 @@
                                 {(task.categories || ['General']).map(cat => {
                                     const catLinks = (task.links || []).filter(l => (l.category || 'General') === cat);
                                     if (catLinks.length === 0) return null;
-                                    const isCollapsed = collapsedSections[`links-${cat}`];
+                                    const isCollapsed = (task.collapsedTags || []).includes(`links-${cat}`);
 
                                     return (
                                         <div key={cat} className="animate-slide-up">
