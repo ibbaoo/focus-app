@@ -758,6 +758,9 @@
             const [accentColor, setAccentColor] = useState('#f97316'); 
             const [activeColId, setActiveColId] = useState('Today');
             const scrollContainerRef = useRef(null);
+            
+            // Ref for debouncing saves
+            const saveTimeoutRef = useRef(null);
 
             usePWAInjection();
             const isMobile = useMobileDetect();
@@ -831,17 +834,8 @@
                 return () => unsubscribeSnapshot(); 
             }, [firebaseUser, appUser]);
 
-            useEffect(() => { 
-                if (!firebaseUser || !appUser) return; 
-                const saveData = async () => { 
-                    try { 
-                        const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'habit_tracker_users', appUser.username); 
-                        await setDoc(userDocRef, { pin: appUser.pin, tasks: tasks, isDarkMode: isDarkMode, accentColor: accentColor, lastUpdated: new Date().toISOString() }, { merge: true }); 
-                    } catch (err) { console.error("Save failed:", err); } 
-                }; 
-                const timeoutId = setTimeout(saveData, 1000); 
-                return () => clearTimeout(timeoutId); 
-            }, [tasks, appUser, firebaseUser, isDarkMode, accentColor]);
+            // REMOVED AUTO-SAVE EFFECT HERE to prevent loops/race conditions
+            // Now we save explicitly on actions
 
             useEffect(() => { 
                 if (!loginName) { setUsernameExists(false); return; } 
@@ -888,6 +882,28 @@
             };
             
             // --- Logic ---
+            
+            const saveToFirestore = (updatedTasks) => {
+                if (!appUser || !firebaseUser) return;
+                const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'habit_tracker_users', appUser.username);
+                // Save immediately without timeout
+                setDoc(userDocRef, { 
+                    pin: appUser.pin, 
+                    tasks: updatedTasks, 
+                    isDarkMode: isDarkMode, 
+                    accentColor: accentColor, 
+                    lastUpdated: new Date().toISOString() 
+                }, { merge: true }).catch(err => console.error("Save error:", err));
+            };
+
+            // Used for text inputs to prevent hammering DB
+            const saveToFirestoreDebounced = (updatedTasks) => {
+                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                saveTimeoutRef.current = setTimeout(() => {
+                    saveToFirestore(updatedTasks);
+                }, 1000);
+            };
+
             const handleAuthAction = async (e) => { e.preventDefault(); if (!loginName.trim() || loginPin.length !== 4) { setAuthError(TEXT.error_fill); return; } setLoading(true); setAuthError(''); const username = loginName.toLowerCase().replace(/\s+/g, '_'); const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'habit_tracker_users', username); try { const docSnap = await getDoc(userDocRef); if (isRegistering) { if (docSnap.exists()) { setAuthError(TEXT.error_taken); setLoading(false); return; } await setDoc(userDocRef, { pin: loginPin, tasks: INITIAL_TASKS, isDarkMode: true, accentColor: '#f97316', createdAt: new Date().toISOString() }); localStorage.setItem('focus_user_creds', JSON.stringify({ username, pin: loginPin })); setAppUser({ username, pin: loginPin }); } else { if (docSnap.exists()) { if (docSnap.data().pin === loginPin) { localStorage.setItem('focus_user_creds', JSON.stringify({ username, pin: loginPin })); setAppUser({ username, pin: loginPin }); } else { setAuthError(TEXT.error_pin); setLoading(false); return; } } else { setAuthError(TEXT.error_user_not_found); setLoading(false); return; } } } catch (err) { setAuthError(TEXT.error_connection); } setLoading(false); };
             const handleLogout = () => { localStorage.removeItem('focus_user_creds'); setAppUser(null); setTasks(INITIAL_TASKS); setLoginName(''); setLoginPin(''); setIsRegistering(false); setIsDarkMode(true); };
             
@@ -898,7 +914,11 @@
                 
                 if (nextIndex >= 0 && nextIndex < statusOrder.length) {
                     const nextStatus = statusOrder[nextIndex];
-                    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: nextStatus } : t));
+                    setTasks(prev => {
+                        const newTasks = prev.map(t => t.id === taskId ? { ...t, status: nextStatus } : t);
+                        saveToFirestore(newTasks); // Instant Save
+                        return newTasks;
+                    });
                     
                     if (nextStatus === 'Completed') {
                         confetti({
@@ -911,16 +931,71 @@
                 }
             };
 
-            const addTask = (e) => { e.preventDefault(); if (!newTaskText.trim()) return; const newTask = { id: generateId(), text: newTaskText, status: 'Today', priority: 'Medium', createdAt: new Date().toISOString(), subtasks: [], categories: ['General'], deadline: '' }; setTasks(prev => [newTask, ...prev]); setNewTaskText(''); };
-            const updateTaskStatus = (id, newStatus) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t)); };
-            const updateTaskPriority = (id, newPriority) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, priority: newPriority } : t)); };
-            const updateTaskText = (taskId, newText) => { setTasks(prev => prev.map(task => task.id === taskId ? { ...task, text: newText } : task)); };
-            const updateTaskDeadline = (taskId, date) => { setTasks(prev => prev.map(task => task.id === taskId ? { ...task, deadline: date } : task)); };
-            const deleteTask = (id) => { setTasks(prev => prev.filter(t => t.id !== id)); setActiveModalTaskId(null); };
+            const addTask = (e) => { 
+                e.preventDefault(); 
+                if (!newTaskText.trim()) return; 
+                const newTask = { id: generateId(), text: newTaskText, status: 'Today', priority: 'Medium', createdAt: new Date().toISOString(), subtasks: [], categories: ['General'], deadline: '' }; 
+                setTasks(prev => {
+                    const newTasks = [newTask, ...prev];
+                    saveToFirestore(newTasks); // Instant Save
+                    return newTasks;
+                }); 
+                setNewTaskText(''); 
+            };
+            
+            // General updater for modal
+            const updateTaskGeneric = (taskId, updates) => {
+                setTasks(prev => {
+                    const newTasks = prev.map(t => t.id === taskId ? { ...t, ...updates } : t);
+                    
+                    // If updating text fields, debounce. Else save instantly.
+                    if (updates.text !== undefined || updates.description !== undefined) {
+                        saveToFirestoreDebounced(newTasks);
+                    } else {
+                        saveToFirestore(newTasks);
+                    }
+                    return newTasks;
+                });
+            };
+
+            const updateTaskStatus = (id, newStatus) => { 
+                setTasks(prev => {
+                    const newTasks = prev.map(t => t.id === id ? { ...t, status: newStatus } : t);
+                    saveToFirestore(newTasks);
+                    return newTasks;
+                }); 
+            };
+
+            const updateTaskPriority = (id, newPriority) => { 
+                updateTaskGeneric(id, { priority: newPriority }); // Will trigger instant save inside generic
+            };
+
+            const updateTaskText = (taskId, newText) => { 
+                updateTaskGeneric(taskId, { text: newText }); // Will trigger debounced save
+            };
+
+            const updateTaskDeadline = (taskId, date) => { 
+                updateTaskGeneric(taskId, { deadline: date }); // Instant save
+            };
+
+            const deleteTask = (id) => { 
+                setTasks(prev => {
+                    const newTasks = prev.filter(t => t.id !== id);
+                    saveToFirestore(newTasks); // Instant save
+                    return newTasks;
+                });
+                setActiveModalTaskId(null); 
+            };
             
             const handleDragStart = (e, taskId) => { setDraggedTaskId(taskId); e.dataTransfer.effectAllowed = "move"; };
             const handleDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
-            const handleDrop = (e, status) => { e.preventDefault(); if (draggedTaskId) { updateTaskStatus(draggedTaskId, status); setDraggedTaskId(null); } };
+            const handleDrop = (e, status) => { 
+                e.preventDefault(); 
+                if (draggedTaskId) { 
+                    updateTaskStatus(draggedTaskId, status); 
+                    setDraggedTaskId(null); 
+                } 
+            };
 
             const getPriorityWeight = (p) => {
                 switch(p) {
@@ -974,7 +1049,7 @@
                         key={activeTask.id}
                         task={activeTask}
                         onClose={() => setActiveModalTaskId(null)}
-                        onUpdate={(updates) => setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, ...updates } : t))}
+                        onUpdate={(updates) => updateTaskGeneric(activeTask.id, updates)}
                         onDelete={() => deleteTask(activeTask.id)}
                         theme={theme}
                     />
