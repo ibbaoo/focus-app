@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FOCUS - Task Board</title>
     
-    <!-- App Icons -->
-    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/906/906334.png">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/906/906334.png">
+    <!-- Modern SVG App Icon (Data URI for reliability on Desktop & Mobile) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23f97316;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23db2777;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23grad)'/%3E%3Cpath d='M368 176L214.3 336 144 263' stroke='white' stroke-width='48' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+    <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23f97316;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23db2777;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23grad)'/%3E%3Cpath d='M368 176L214.3 336 144 263' stroke='white' stroke-width='48' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23f97316;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23db2777;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23grad)'/%3E%3Cpath d='M368 176L214.3 336 144 263' stroke='white' stroke-width='48' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -162,7 +163,24 @@
 
         const usePWAInjection = () => {
             useEffect(() => {
-                const iconUrl = "https://cdn-icons-png.flaticon.com/512/906/906334.png"; 
+                // Using SVG Data URI for immediate and reliable icon rendering
+                const iconSvg = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23f97316;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23db2777;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23grad)'/%3E%3Cpath d='M368 176L214.3 336 144 263' stroke='white' stroke-width='48' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E`;
+                
+                // Helper to update link tags
+                const updateLink = (rel, href) => {
+                    let link = document.querySelector(`link[rel="${rel}"]`);
+                    if (!link) {
+                        link = document.createElement('link');
+                        link.rel = rel;
+                        document.head.appendChild(link);
+                    }
+                    link.href = href;
+                };
+
+                updateLink('icon', iconSvg);
+                updateLink('shortcut icon', iconSvg);
+                updateLink('apple-touch-icon', iconSvg);
+
                 const manifest = {
                     "name": "FOCUS",
                     "short_name": "FOCUS",
@@ -171,21 +189,14 @@
                     "background_color": "#000000",
                     "theme_color": "#000000",
                     "icons": [
-                        { "src": iconUrl, "sizes": "192x192", "type": "image/png" },
-                        { "src": iconUrl, "sizes": "512x512", "type": "image/png" }
+                        { "src": iconSvg, "sizes": "512x512", "type": "image/svg+xml" }
                     ]
                 };
                 const stringManifest = JSON.stringify(manifest);
                 const blob = new Blob([stringManifest], {type: 'application/json'});
                 const manifestURL = URL.createObjectURL(blob);
-                
-                let linkManifest = document.querySelector('link[rel="manifest"]');
-                if (!linkManifest) {
-                    linkManifest = document.createElement('link');
-                    linkManifest.rel = 'manifest';
-                    document.head.appendChild(linkManifest);
-                }
-                linkManifest.href = manifestURL;
+                updateLink('manifest', manifestURL);
+
                 return () => URL.revokeObjectURL(manifestURL);
             }, []);
         };
@@ -213,7 +224,53 @@
             return `${year}-${month}-${day}`;
         };
 
-        // Web Audio API Sound Effect for Completion
+        // --- Sound Effects ---
+        const playClickSound = () => {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                osc.type = 'sine'; 
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.03);
+                
+                gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+                
+                osc.start();
+                osc.stop(ctx.currentTime + 0.04);
+            } catch (e) {}
+        };
+
+        const playDeleteSound = () => {
+             try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.15);
+                
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+                
+                osc.start();
+                osc.stop(ctx.currentTime + 0.16);
+            } catch (e) {}
+        };
+
         const playSuccessSound = () => {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -394,6 +451,7 @@
                 } else {
                     newTags = [...currentTags, tagName];
                 }
+                playClickSound();
                 onUpdate({ categories: newTags });
             };
 
@@ -402,6 +460,7 @@
                 const newCollapsed = currentCollapsed.includes(sectionKey) 
                     ? currentCollapsed.filter(k => k !== sectionKey)
                     : [...currentCollapsed, sectionKey];
+                playClickSound();
                 onUpdate({ collapsedTags: newCollapsed });
             };
 
@@ -418,6 +477,7 @@
                 const currentCats = task.categories || ['General'];
                 const newCats = currentCats.includes(newLinkCategory) ? currentCats : [...currentCats, newLinkCategory];
 
+                playClickSound();
                 onUpdate({ 
                     categories: newCats,
                     links: [...(task.links || []), linkObj] 
@@ -428,11 +488,17 @@
             };
 
             const deleteLink = (linkId) => {
+                playDeleteSound();
                 onUpdate({ links: (task.links || []).filter(l => l.id !== linkId) });
             };
 
+            const handleClose = () => {
+                playClickSound();
+                onClose();
+            };
+
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={theme.modalOverlay} onClick={onClose}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={theme.modalOverlay} onClick={handleClose}>
                     <div className="w-full max-w-lg rounded-[2.5rem] shadow-2xl animate-spring flex flex-col max-h-[85vh] overflow-hidden" style={theme.card} onClick={(e) => e.stopPropagation()}>
                         
                         {/* --- Header --- */}
@@ -445,7 +511,7 @@
                                         {mode === 'edit' ? (
                                             <div className="flex gap-1 p-1 rounded-lg border bg-opacity-10" style={{ borderColor: theme.card.borderColor }}>
                                                 {['Low', 'Medium', 'High'].map(p => (
-                                                    <button key={p} onClick={() => onUpdate({ priority: p })} className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md transition-all ${task.priority === p ? 'shadow-sm text-white' : 'opacity-50'}`} style={task.priority === p ? { backgroundColor: p === 'High' ? '#ef4444' : p === 'Medium' ? '#f97316' : '#3b82f6' } : { color: theme.textSec.color }}>{p}</button>
+                                                    <button key={p} onClick={() => { playClickSound(); onUpdate({ priority: p }); }} className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md transition-all ${task.priority === p ? 'shadow-sm text-white' : 'opacity-50'}`} style={task.priority === p ? { backgroundColor: p === 'High' ? '#ef4444' : p === 'Medium' ? '#f97316' : '#3b82f6' } : { color: theme.textSec.color }}>{p}</button>
                                                 ))}
                                             </div>
                                         ) : (
@@ -464,10 +530,10 @@
                                     />
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => setMode(mode === 'view' ? 'edit' : 'view')} className={`p-2 rounded-full transition-colors ${mode === 'edit' ? 'bg-green-500 text-white shadow-lg' : 'hover:bg-black/5'}`} style={mode === 'view' ? { color: theme.textSec.color } : {}}>
+                                    <button onClick={() => { playClickSound(); setMode(mode === 'view' ? 'edit' : 'view'); }} className={`p-2 rounded-full transition-colors ${mode === 'edit' ? 'bg-green-500 text-white shadow-lg' : 'hover:bg-black/5'}`} style={mode === 'view' ? { color: theme.textSec.color } : {}}>
                                         {mode === 'view' ? <Edit3 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
                                     </button>
-                                    <button onClick={onClose} className="p-2 rounded-full hover:bg-black/5 transition-colors" style={{ color: theme.textSec.color }}><X className="w-6 h-6" /></button>
+                                    <button onClick={handleClose} className="p-2 rounded-full hover:bg-black/5 transition-colors" style={{ color: theme.textSec.color }}><X className="w-6 h-6" /></button>
                                 </div>
                             </div>
 
@@ -483,8 +549,8 @@
                                 </div>
                                 {mode === 'edit' && (
                                     <div className="flex gap-2">
-                                        <button onClick={() => { onUpdate({ deadline: getLocalISODate(0) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-opacity-10 hover:bg-opacity-20 transition-all border" style={{ backgroundColor: theme.accent, borderColor: 'transparent', color: theme.textMain.color }}>Today</button>
-                                        <button onClick={() => { onUpdate({ deadline: getLocalISODate(1) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border hover:opacity-80" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>Tom.</button>
+                                        <button onClick={() => { playClickSound(); onUpdate({ deadline: getLocalISODate(0) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-opacity-10 hover:bg-opacity-20 transition-all border" style={{ backgroundColor: theme.accent, borderColor: 'transparent', color: theme.textMain.color }}>Today</button>
+                                        <button onClick={() => { playClickSound(); onUpdate({ deadline: getLocalISODate(1) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border hover:opacity-80" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>Tom.</button>
                                     </div>
                                 )}
                             </div>
@@ -516,7 +582,7 @@
                                                     <button onClick={() => { if(tempCategoryName.trim()) { toggleTag(tempCategoryName.trim()); setIsAddingNewCategory(false); setTempCategoryName(''); }}}><Check className="w-4 h-4 text-green-500" /></button>
                                                 </div>
                                             ) : (
-                                                <button onClick={() => setIsAddingNewCategory(true)} className="px-4 py-2 rounded-xl text-sm font-bold border-2 border-dashed hover:opacity-100 opacity-60 transition-all flex items-center gap-1" style={{ borderColor: theme.textSec.color, color: theme.textSec.color }}><Plus className="w-4 h-4" /> New</button>
+                                                <button onClick={() => { playClickSound(); setIsAddingNewCategory(true); }} className="px-4 py-2 rounded-xl text-sm font-bold border-2 border-dashed hover:opacity-100 opacity-60 transition-all flex items-center gap-1" style={{ borderColor: theme.textSec.color, color: theme.textSec.color }}><Plus className="w-4 h-4" /> New</button>
                                             )}
                                         </>
                                     )}
@@ -555,6 +621,7 @@
                                                             <div className="flex items-start gap-3">
                                                                 <button 
                                                                     onClick={() => {
+                                                                        playClickSound();
                                                                         onUpdate({ 
                                                                             subtasks: task.subtasks.map(s => s.id === subtask.id ? { ...s, completed: !s.completed } : s)
                                                                         });
@@ -575,7 +642,7 @@
                                                                 </div>
                                                                 {mode === 'edit' && (
                                                                     <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <button onClick={() => onUpdate({ subtasks: task.subtasks.filter(s => s.id !== subtask.id) })} className="p-1.5 hover:bg-red-500/10 rounded-lg text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                                                        <button onClick={() => { playDeleteSound(); onUpdate({ subtasks: task.subtasks.filter(s => s.id !== subtask.id) }); }} className="p-1.5 hover:bg-red-500/10 rounded-lg text-red-500"><Trash2 className="w-4 h-4" /></button>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -600,6 +667,7 @@
                                                     // Add category to task if not exists
                                                     const currentCats = task.categories || ['General'];
                                                     const newCats = currentCats.includes(newSubtaskCategory) ? currentCats : [...currentCats, newSubtaskCategory];
+                                                    playClickSound();
                                                     onUpdate({ 
                                                         categories: newCats,
                                                         subtasks: [...(task.subtasks || []), newSub] 
@@ -697,7 +765,7 @@
                                             </div>
                                         </div>
                                     ) : (
-                                        <button onClick={() => setIsAddingLink(true)} className="w-full py-2 border border-dashed rounded-xl text-xs font-bold opacity-50 hover:opacity-100 transition-all flex items-center justify-center gap-2" style={{ borderColor: theme.textSec.color, color: theme.textSec.color }}>
+                                        <button onClick={() => { playClickSound(); setIsAddingLink(true); }} className="w-full py-2 border border-dashed rounded-xl text-xs font-bold opacity-50 hover:opacity-100 transition-all flex items-center justify-center gap-2" style={{ borderColor: theme.textSec.color, color: theme.textSec.color }}>
                                             <Plus className="w-3 h-3" /> Add Link
                                         </button>
                                     )
@@ -731,11 +799,11 @@
                                 {deleteConfirmation ? (
                                     <>
                                         <span className="text-xs font-bold text-red-500 animate-fade-in">Sure?</span>
-                                        <button onClick={onDelete} className="px-4 py-2 rounded-xl text-xs font-bold bg-red-500 text-white hover:bg-red-600 transition-colors shadow-lg">Yes</button>
-                                        <button onClick={() => setDeleteConfirmation(false)} className="px-4 py-2 rounded-xl text-xs font-bold border hover:bg-black/5 transition-colors" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>No</button>
+                                        <button onClick={() => { playDeleteSound(); onDelete(); }} className="px-4 py-2 rounded-xl text-xs font-bold bg-red-500 text-white hover:bg-red-600 transition-colors shadow-lg">Yes</button>
+                                        <button onClick={() => { playClickSound(); setDeleteConfirmation(false); }} className="px-4 py-2 rounded-xl text-xs font-bold border hover:bg-black/5 transition-colors" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>No</button>
                                     </>
                                 ) : (
-                                    <button onClick={() => setDeleteConfirmation(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors">
+                                    <button onClick={() => { playClickSound(); setDeleteConfirmation(true); }} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors">
                                         <Trash2 className="w-4 h-4" /> Delete
                                     </button>
                                 )}
@@ -908,6 +976,7 @@
             const handleLogout = () => { localStorage.removeItem('focus_user_creds'); setAppUser(null); setTasks(INITIAL_TASKS); setLoginName(''); setLoginPin(''); setIsRegistering(false); setIsDarkMode(true); };
             
             const moveTaskStatus = (taskId, currentStatus, direction) => {
+                playClickSound();
                 const statusOrder = ['Upcoming', 'Today', 'In Progress', 'Completed'];
                 const currentIndex = statusOrder.indexOf(currentStatus || 'Today');
                 const nextIndex = currentIndex + direction;
@@ -934,6 +1003,7 @@
             const addTask = (e) => { 
                 e.preventDefault(); 
                 if (!newTaskText.trim()) return; 
+                playClickSound();
                 const newTask = { id: generateId(), text: newTaskText, status: 'Today', priority: 'Medium', createdAt: new Date().toISOString(), subtasks: [], categories: ['General'], deadline: '' }; 
                 setTasks(prev => {
                     const newTasks = [newTask, ...prev];
@@ -1024,12 +1094,12 @@
                 <style>{GLOBAL_STYLES}</style>
                 <div className={`p-8 rounded-[2rem] shadow-2xl w-full max-w-md border animate-spring relative`} style={theme.card}>
                     <div className="text-center mb-8"><h1 className="text-5xl font-black tracking-tighter mb-2" style={theme.textMain}>FOCUS</h1><p className={`text-sm`} style={theme.textSec}>{isRegistering ? TEXT.create_profile : TEXT.welcome}</p></div>
-                    <div className={`flex p-1 rounded-2xl mb-8`} style={theme.input}><button onClick={() => { setIsRegistering(false); setAuthError(''); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all btn-press ${!isRegistering ? 'shadow-md' : 'opacity-60'}`} style={!isRegistering ? { backgroundColor: theme.card.backgroundColor, color: theme.textMain.color } : { color: theme.textSec.color }}>{TEXT.sign_in}</button><button onClick={() => { setIsRegistering(true); setAuthError(''); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all btn-press ${isRegistering ? 'shadow-md' : 'opacity-60'}`} style={isRegistering ? { backgroundColor: theme.card.backgroundColor, color: theme.textMain.color } : { color: theme.textSec.color }}>{TEXT.create_account}</button></div>
+                    <div className={`flex p-1 rounded-2xl mb-8`} style={theme.input}><button onClick={() => { playClickSound(); setIsRegistering(false); setAuthError(''); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all btn-press ${!isRegistering ? 'shadow-md' : 'opacity-60'}`} style={!isRegistering ? { backgroundColor: theme.card.backgroundColor, color: theme.textMain.color } : { color: theme.textSec.color }}>{TEXT.sign_in}</button><button onClick={() => { playClickSound(); setIsRegistering(true); setAuthError(''); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all btn-press ${isRegistering ? 'shadow-md' : 'opacity-60'}`} style={isRegistering ? { backgroundColor: theme.card.backgroundColor, color: theme.textMain.color } : { color: theme.textSec.color }}>{TEXT.create_account}</button></div>
                     <form onSubmit={handleAuthAction} className="space-y-4">
                     <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}><label className={`block text-xs font-bold uppercase mb-2 ml-1`} style={theme.textSec}>{TEXT.username}</label><div className="relative"><User className="absolute left-4 top-3.5 w-5 h-5" style={theme.textSec} /><input type="text" value={loginName} onChange={(e) => setLoginName(e.target.value)} placeholder={TEXT.username_placeholder} className={`w-full pl-12 pr-4 py-3.5 rounded-2xl outline-none transition-all font-medium`} style={theme.input} autoFocus /></div></div>
                     <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}><label className={`block text-xs font-bold uppercase mb-2 ml-1`} style={theme.textSec}>{TEXT.pin}</label><div className="relative"><Lock className="absolute left-4 top-3.5 w-5 h-5" style={theme.textSec} /><input type="password" value={loginPin} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 4); setLoginPin(val); }} placeholder={TEXT.pin_placeholder} className={`w-full pl-12 pr-4 py-3.5 rounded-2xl outline-none transition-all font-bold tracking-widest`} style={theme.input} /></div></div>
                     {authError && (<div className="p-4 bg-red-500/10 text-red-500 text-sm rounded-2xl flex items-center gap-2 animate-spring font-bold"><div className="w-2 h-2 rounded-full bg-red-500" />{authError}</div>)}
-                    <button type="submit" className={`w-full font-bold py-4 rounded-2xl hover:opacity-90 btn-press transition-all shadow-lg mt-4 flex items-center justify-center gap-2 animate-slide-up`} style={theme.buttonPrimary}>{isRegistering ? <><UserPlus className="w-5 h-5"/> {TEXT.btn_create_profile}</> : <><LogIn className="w-5 h-5"/> {TEXT.btn_sign_in}</>}</button>
+                    <button type="submit" onClick={playClickSound} className={`w-full font-bold py-4 rounded-2xl hover:opacity-90 btn-press transition-all shadow-lg mt-4 flex items-center justify-center gap-2 animate-slide-up`} style={theme.buttonPrimary}>{isRegistering ? <><UserPlus className="w-5 h-5"/> {TEXT.btn_create_profile}</> : <><LogIn className="w-5 h-5"/> {TEXT.btn_sign_in}</>}</button>
                     </form>
                 </div>
                 </div>
@@ -1066,7 +1136,7 @@
                     </div>
                     
                     <div className="flex items-center gap-2 md:gap-3">
-                        <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-xl border hover:bg-black/5 transition-all" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>
+                        <button onClick={() => { playClickSound(); setIsDarkMode(!isDarkMode); }} className="p-2 rounded-xl border hover:bg-black/5 transition-all" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>
                             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                         </button>
                         <div className="relative group hidden md:block">
@@ -1075,12 +1145,12 @@
                             </button>
                             <div className="absolute right-0 top-full mt-2 bg-white dark:bg-neutral-900 border p-2 rounded-2xl shadow-xl grid grid-cols-5 gap-1.5 w-48 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                                 {QUICK_COLORS.map(c => (
-                                    <button key={c} onClick={() => setAccentColor(c)} className="w-8 h-8 rounded-full border shadow-sm hover:scale-110 transition-transform" style={{ backgroundColor: c, borderColor: theme.card.borderColor }} />
+                                    <button key={c} onClick={() => { playClickSound(); setAccentColor(c); }} className="w-8 h-8 rounded-full border shadow-sm hover:scale-110 transition-transform" style={{ backgroundColor: c, borderColor: theme.card.borderColor }} />
                                 ))}
                             </div>
                         </div>
                         <div className="w-[1px] h-6 bg-gray-500/20 mx-1" />
-                        <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-red-500/10 text-red-500 transition-all" title={TEXT.sign_out}>
+                        <button onClick={() => { playClickSound(); handleLogout(); }} className="p-2 rounded-xl hover:bg-red-500/10 text-red-500 transition-all" title={TEXT.sign_out}>
                             <LogOut className="w-5 h-5" />
                         </button>
                     </div>
@@ -1115,7 +1185,7 @@
                                             <span className={`text-xs font-bold px-2.5 py-1 rounded-lg opacity-50`} style={{ backgroundColor: theme.input.backgroundColor, color: theme.textMain.color }}>{colTasks.length}</span>
                                         </div>
                                         {col.id === 'Today' && (
-                                            <button onClick={() => { if(newTaskText.trim()) addTask({ preventDefault: () => {} }); }} className="p-2 rounded-full hover:bg-black/5 transition-colors" title="Quick Add"><Plus className="w-5 h-5" style={theme.textSec} /></button>
+                                            <button onClick={() => { if(newTaskText.trim()) { playClickSound(); addTask({ preventDefault: () => {} }); } }} className="p-2 rounded-full hover:bg-black/5 transition-colors" title="Quick Add"><Plus className="w-5 h-5" style={theme.textSec} /></button>
                                         )}
                                     </div>
 
@@ -1150,7 +1220,7 @@
                                                     onDragStart={(e) => handleDragStart(e, task.id)}
                                                     className={`rounded-2xl p-4 shadow-sm border relative transition-all cursor-grab active:cursor-grabbing animate-slide-up group hover:shadow-md hover:scale-[1.01]`}
                                                     style={{ backgroundColor: theme.card.backgroundColor, borderColor: theme.card.borderColor, animationDelay: `${index * 0.05}s` }}
-                                                    onClick={() => setActiveModalTaskId(task.id)}
+                                                    onClick={() => { playClickSound(); setActiveModalTaskId(task.id); }}
                                                 >
                                                     {/* Navigation Controls */}
                                                     <div className="absolute top-4 right-4 flex gap-1 z-10">
@@ -1240,7 +1310,7 @@
                     {/* Bottom Navigation for Mobile */}
                     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-full flex gap-4 shadow-2xl border border-white/10 md:hidden">
                        {COLUMNS.map((col, idx) => (
-                           <button key={col.id} onClick={() => scrollToColumn(idx)} className={`p-2 rounded-full transition-all ${activeColId === col.id ? 'bg-white/20' : 'text-gray-400'}`} style={activeColId === col.id ? { color: theme.accent } : {}}>
+                           <button key={col.id} onClick={() => { playClickSound(); scrollToColumn(idx); }} className={`p-2 rounded-full transition-all ${activeColId === col.id ? 'bg-white/20' : 'text-gray-400'}`} style={activeColId === col.id ? { color: theme.accent } : {}}>
                               <col.icon className="w-5 h-5" />
                            </button>
                        ))}
