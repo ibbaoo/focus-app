@@ -118,6 +118,21 @@
             resize: none;
             overflow: hidden;
         }
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(128, 128, 128, 0.2);
+            border-radius: 10px;
+        }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+            background: rgba(128, 128, 128, 0.4);
+        }
         `;
 
         const TEXT = {
@@ -163,10 +178,10 @@
 
         const usePWAInjection = () => {
             useEffect(() => {
-                // Using SVG Data URI for immediate and reliable icon rendering
-                const iconSvg = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23f97316;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23db2777;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23grad)'/%3E%3Cpath d='M368 176L214.3 336 144 263' stroke='white' stroke-width='48' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E`;
+                // Read the icon from the HTML head to ensure consistency
+                const existingIcon = document.querySelector('link[rel="icon"]');
+                const iconSvg = existingIcon ? existingIcon.href : `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23f97316;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23db2777;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23grad)'/%3E%3Cpath d='M368 176L214.3 336 144 263' stroke='white' stroke-width='48' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E`;
                 
-                // Helper to update link tags
                 const updateLink = (rel, href) => {
                     let link = document.querySelector(`link[rel="${rel}"]`);
                     if (!link) {
@@ -177,7 +192,7 @@
                     link.href = href;
                 };
 
-                updateLink('icon', iconSvg);
+                // Sync other icon types with the main icon
                 updateLink('shortcut icon', iconSvg);
                 updateLink('apple-touch-icon', iconSvg);
 
@@ -189,7 +204,12 @@
                     "background_color": "#000000",
                     "theme_color": "#000000",
                     "icons": [
-                        { "src": iconSvg, "sizes": "512x512", "type": "image/svg+xml" }
+                        { 
+                            "src": iconSvg, 
+                            "sizes": "512x512", 
+                            "type": "image/svg+xml",
+                            "purpose": "any maskable" 
+                        }
                     ]
                 };
                 const stringManifest = JSON.stringify(manifest);
@@ -214,7 +234,6 @@
 
         const generateId = () => Math.random().toString(36).substr(2, 9);
 
-        // Helper to get local date string YYYY-MM-DD
         const getLocalISODate = (offsetDays = 0) => {
             const d = new Date();
             d.setDate(d.getDate() + offsetDays);
@@ -224,76 +243,113 @@
             return `${year}-${month}-${day}`;
         };
 
-        // --- Sound Effects ---
-        const playClickSound = () => {
-            try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (!AudioContext) return;
-                const ctx = new AudioContext();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
+        // --- Professional Audio Engine ---
+        const SoundEngine = {
+            ctx: null,
+            init: function() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playClick: function() {
+                this.init();
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                // Professional "Tick" - crisp and short
+                osc.frequency.setValueAtTime(800, t);
+                osc.frequency.exponentialRampToValueAtTime(1200, t + 0.01);
+                gain.gain.setValueAtTime(0.05, t); // Reduced volume
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
                 
                 osc.connect(gain);
-                gain.connect(ctx.destination);
-                
-                osc.type = 'sine'; 
-                osc.frequency.setValueAtTime(800, ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.03);
-                
-                gain.gain.setValueAtTime(0.05, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
-                
+                gain.connect(this.ctx.destination);
                 osc.start();
-                osc.stop(ctx.currentTime + 0.04);
-            } catch (e) {}
-        };
+                osc.stop(t + 0.05);
+            },
+            playDelete: function() {
+                this.init();
+                const t = this.ctx.currentTime;
+                const bufferSize = this.ctx.sampleRate * 0.2; // 0.2 seconds
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1; // White noise
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1000, t);
+                filter.frequency.exponentialRampToValueAtTime(100, t + 0.15); // Sweep down
 
-        const playDeleteSound = () => {
-             try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (!AudioContext) return;
-                const ctx = new AudioContext();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(150, ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.15);
-                
-                gain.gain.setValueAtTime(0.1, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-                
-                osc.start();
-                osc.stop(ctx.currentTime + 0.16);
-            } catch (e) {}
-        };
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.08, t); // Reduced volume
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
 
-        const playSuccessSound = () => {
-            try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (!AudioContext) return;
-                
-                const ctx = new AudioContext();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start();
+            },
+            playSuccess: function() {
+                this.init();
+                const t = this.ctx.currentTime;
+                // Major Chord Arpeggio (C5, E5, G5)
+                [523.25, 659.25, 783.99].forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, t + i * 0.05);
+                    gain.gain.setValueAtTime(0, t + i * 0.05);
+                    gain.gain.linearRampToValueAtTime(0.05, t + i * 0.05 + 0.02); // Reduced volume
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.05 + 0.4);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(t + i * 0.05);
+                    osc.stop(t + i * 0.05 + 0.4);
+                });
+            },
+            playAdd: function() {
+                this.init();
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                // "Bubble" Pop
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
-                osc.frequency.exponentialRampToValueAtTime(1046.5, ctx.currentTime + 0.1); // C6
+                osc.frequency.setValueAtTime(300, t);
+                osc.frequency.exponentialRampToValueAtTime(600, t + 0.1);
+                gain.gain.setValueAtTime(0.08, t); // Reduced volume
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
                 
-                gain.gain.setValueAtTime(0.1, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
                 osc.start();
-                osc.stop(ctx.currentTime + 0.4);
-            } catch (e) {
-                console.error("Audio play failed", e);
+                osc.stop(t + 0.1);
+            },
+            playSwitch: function() {
+                this.init();
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                // Subtle "Whoosh" / Slide
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.linearRampToValueAtTime(300, t + 0.1);
+                gain.gain.setValueAtTime(0.03, t); // Reduced volume
+                gain.gain.linearRampToValueAtTime(0, t + 0.1);
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(500, t);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(t + 0.1);
             }
         };
 
@@ -451,7 +507,7 @@
                 } else {
                     newTags = [...currentTags, tagName];
                 }
-                playClickSound();
+                SoundEngine.playClick();
                 onUpdate({ categories: newTags });
             };
 
@@ -460,7 +516,7 @@
                 const newCollapsed = currentCollapsed.includes(sectionKey) 
                     ? currentCollapsed.filter(k => k !== sectionKey)
                     : [...currentCollapsed, sectionKey];
-                playClickSound();
+                SoundEngine.playClick();
                 onUpdate({ collapsedTags: newCollapsed });
             };
 
@@ -477,7 +533,7 @@
                 const currentCats = task.categories || ['General'];
                 const newCats = currentCats.includes(newLinkCategory) ? currentCats : [...currentCats, newLinkCategory];
 
-                playClickSound();
+                SoundEngine.playAdd();
                 onUpdate({ 
                     categories: newCats,
                     links: [...(task.links || []), linkObj] 
@@ -488,12 +544,12 @@
             };
 
             const deleteLink = (linkId) => {
-                playDeleteSound();
+                SoundEngine.playDelete();
                 onUpdate({ links: (task.links || []).filter(l => l.id !== linkId) });
             };
 
             const handleClose = () => {
-                playClickSound();
+                SoundEngine.playClick();
                 onClose();
             };
 
@@ -511,7 +567,7 @@
                                         {mode === 'edit' ? (
                                             <div className="flex gap-1 p-1 rounded-lg border bg-opacity-10" style={{ borderColor: theme.card.borderColor }}>
                                                 {['Low', 'Medium', 'High'].map(p => (
-                                                    <button key={p} onClick={() => { playClickSound(); onUpdate({ priority: p }); }} className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md transition-all ${task.priority === p ? 'shadow-sm text-white' : 'opacity-50'}`} style={task.priority === p ? { backgroundColor: p === 'High' ? '#ef4444' : p === 'Medium' ? '#f97316' : '#3b82f6' } : { color: theme.textSec.color }}>{p}</button>
+                                                    <button key={p} onClick={() => { SoundEngine.playClick(); onUpdate({ priority: p }); }} className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md transition-all ${task.priority === p ? 'shadow-sm text-white' : 'opacity-50'}`} style={task.priority === p ? { backgroundColor: p === 'High' ? '#ef4444' : p === 'Medium' ? '#f97316' : '#3b82f6' } : { color: theme.textSec.color }}>{p}</button>
                                                 ))}
                                             </div>
                                         ) : (
@@ -530,7 +586,7 @@
                                     />
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => { playClickSound(); setMode(mode === 'view' ? 'edit' : 'view'); }} className={`p-2 rounded-full transition-colors ${mode === 'edit' ? 'bg-green-500 text-white shadow-lg' : 'hover:bg-black/5'}`} style={mode === 'view' ? { color: theme.textSec.color } : {}}>
+                                    <button onClick={() => { SoundEngine.playClick(); setMode(mode === 'view' ? 'edit' : 'view'); }} className={`p-2 rounded-full transition-colors ${mode === 'edit' ? 'bg-green-500 text-white shadow-lg' : 'hover:bg-black/5'}`} style={mode === 'view' ? { color: theme.textSec.color } : {}}>
                                         {mode === 'view' ? <Edit3 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
                                     </button>
                                     <button onClick={handleClose} className="p-2 rounded-full hover:bg-black/5 transition-colors" style={{ color: theme.textSec.color }}><X className="w-6 h-6" /></button>
@@ -549,8 +605,8 @@
                                 </div>
                                 {mode === 'edit' && (
                                     <div className="flex gap-2">
-                                        <button onClick={() => { playClickSound(); onUpdate({ deadline: getLocalISODate(0) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-opacity-10 hover:bg-opacity-20 transition-all border" style={{ backgroundColor: theme.accent, borderColor: 'transparent', color: theme.textMain.color }}>Today</button>
-                                        <button onClick={() => { playClickSound(); onUpdate({ deadline: getLocalISODate(1) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border hover:opacity-80" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>Tom.</button>
+                                        <button onClick={() => { SoundEngine.playClick(); onUpdate({ deadline: getLocalISODate(0) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-opacity-10 hover:bg-opacity-20 transition-all border" style={{ backgroundColor: theme.accent, borderColor: 'transparent', color: theme.textMain.color }}>Today</button>
+                                        <button onClick={() => { SoundEngine.playClick(); onUpdate({ deadline: getLocalISODate(1) }); }} className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border hover:opacity-80" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>Tom.</button>
                                     </div>
                                 )}
                             </div>
@@ -582,7 +638,7 @@
                                                     <button onClick={() => { if(tempCategoryName.trim()) { toggleTag(tempCategoryName.trim()); setIsAddingNewCategory(false); setTempCategoryName(''); }}}><Check className="w-4 h-4 text-green-500" /></button>
                                                 </div>
                                             ) : (
-                                                <button onClick={() => { playClickSound(); setIsAddingNewCategory(true); }} className="px-4 py-2 rounded-xl text-sm font-bold border-2 border-dashed hover:opacity-100 opacity-60 transition-all flex items-center gap-1" style={{ borderColor: theme.textSec.color, color: theme.textSec.color }}><Plus className="w-4 h-4" /> New</button>
+                                                <button onClick={() => { SoundEngine.playClick(); setIsAddingNewCategory(true); }} className="px-4 py-2 rounded-xl text-sm font-bold border-2 border-dashed hover:opacity-100 opacity-60 transition-all flex items-center gap-1" style={{ borderColor: theme.textSec.color, color: theme.textSec.color }}><Plus className="w-4 h-4" /> New</button>
                                             )}
                                         </>
                                     )}
@@ -621,7 +677,7 @@
                                                             <div className="flex items-start gap-3">
                                                                 <button 
                                                                     onClick={() => {
-                                                                        playClickSound();
+                                                                        SoundEngine.playClick();
                                                                         onUpdate({ 
                                                                             subtasks: task.subtasks.map(s => s.id === subtask.id ? { ...s, completed: !s.completed } : s)
                                                                         });
@@ -642,7 +698,7 @@
                                                                 </div>
                                                                 {mode === 'edit' && (
                                                                     <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <button onClick={() => { playDeleteSound(); onUpdate({ subtasks: task.subtasks.filter(s => s.id !== subtask.id) }); }} className="p-1.5 hover:bg-red-500/10 rounded-lg text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                                                        <button onClick={() => { SoundEngine.playDelete(); onUpdate({ subtasks: task.subtasks.filter(s => s.id !== subtask.id) }); }} className="p-1.5 hover:bg-red-500/10 rounded-lg text-red-500"><Trash2 className="w-4 h-4" /></button>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -667,7 +723,7 @@
                                                     // Add category to task if not exists
                                                     const currentCats = task.categories || ['General'];
                                                     const newCats = currentCats.includes(newSubtaskCategory) ? currentCats : [...currentCats, newSubtaskCategory];
-                                                    playClickSound();
+                                                    SoundEngine.playAdd();
                                                     onUpdate({ 
                                                         categories: newCats,
                                                         subtasks: [...(task.subtasks || []), newSub] 
@@ -765,7 +821,7 @@
                                             </div>
                                         </div>
                                     ) : (
-                                        <button onClick={() => { playClickSound(); setIsAddingLink(true); }} className="w-full py-2 border border-dashed rounded-xl text-xs font-bold opacity-50 hover:opacity-100 transition-all flex items-center justify-center gap-2" style={{ borderColor: theme.textSec.color, color: theme.textSec.color }}>
+                                        <button onClick={() => { SoundEngine.playClick(); setIsAddingLink(true); }} className="w-full py-2 border border-dashed rounded-xl text-xs font-bold opacity-50 hover:opacity-100 transition-all flex items-center justify-center gap-2" style={{ borderColor: theme.textSec.color, color: theme.textSec.color }}>
                                             <Plus className="w-3 h-3" /> Add Link
                                         </button>
                                     )
@@ -799,11 +855,11 @@
                                 {deleteConfirmation ? (
                                     <>
                                         <span className="text-xs font-bold text-red-500 animate-fade-in">Sure?</span>
-                                        <button onClick={() => { playDeleteSound(); onDelete(); }} className="px-4 py-2 rounded-xl text-xs font-bold bg-red-500 text-white hover:bg-red-600 transition-colors shadow-lg">Yes</button>
-                                        <button onClick={() => { playClickSound(); setDeleteConfirmation(false); }} className="px-4 py-2 rounded-xl text-xs font-bold border hover:bg-black/5 transition-colors" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>No</button>
+                                        <button onClick={() => { SoundEngine.playDelete(); onDelete(); }} className="px-4 py-2 rounded-xl text-xs font-bold bg-red-500 text-white hover:bg-red-600 transition-colors shadow-lg">Yes</button>
+                                        <button onClick={() => { SoundEngine.playClick(); setDeleteConfirmation(false); }} className="px-4 py-2 rounded-xl text-xs font-bold border hover:bg-black/5 transition-colors" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>No</button>
                                     </>
                                 ) : (
-                                    <button onClick={() => { playClickSound(); setDeleteConfirmation(true); }} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors">
+                                    <button onClick={() => { SoundEngine.playClick(); setDeleteConfirmation(true); }} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors">
                                         <Trash2 className="w-4 h-4" /> Delete
                                     </button>
                                 )}
@@ -891,6 +947,10 @@
                 const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'habit_tracker_users', appUser.username); 
                 const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => { 
                     if (docSnap.exists()) { 
+                        // CRITICAL FIX: Ignore snapshots that originate from our own local writes (pending writes).
+                        // This prevents the "cursor jumping" or text reverting issue when typing fast.
+                        if (docSnap.metadata.hasPendingWrites) return;
+
                         const data = docSnap.data(); 
                         if (data.pin === appUser.pin) { 
                             if (data.tasks) setTasks(data.tasks); 
@@ -901,9 +961,6 @@
                 }, (error) => { console.error("Sync error:", error); }); 
                 return () => unsubscribeSnapshot(); 
             }, [firebaseUser, appUser]);
-
-            // REMOVED AUTO-SAVE EFFECT HERE to prevent loops/race conditions
-            // Now we save explicitly on actions
 
             useEffect(() => { 
                 if (!loginName) { setUsernameExists(false); return; } 
@@ -972,11 +1029,37 @@
                 }, 1000);
             };
 
-            const handleAuthAction = async (e) => { e.preventDefault(); if (!loginName.trim() || loginPin.length !== 4) { setAuthError(TEXT.error_fill); return; } setLoading(true); setAuthError(''); const username = loginName.toLowerCase().replace(/\s+/g, '_'); const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'habit_tracker_users', username); try { const docSnap = await getDoc(userDocRef); if (isRegistering) { if (docSnap.exists()) { setAuthError(TEXT.error_taken); setLoading(false); return; } await setDoc(userDocRef, { pin: loginPin, tasks: INITIAL_TASKS, isDarkMode: true, accentColor: '#f97316', createdAt: new Date().toISOString() }); localStorage.setItem('focus_user_creds', JSON.stringify({ username, pin: loginPin })); setAppUser({ username, pin: loginPin }); } else { if (docSnap.exists()) { if (docSnap.data().pin === loginPin) { localStorage.setItem('focus_user_creds', JSON.stringify({ username, pin: loginPin })); setAppUser({ username, pin: loginPin }); } else { setAuthError(TEXT.error_pin); setLoading(false); return; } } else { setAuthError(TEXT.error_user_not_found); setLoading(false); return; } } } catch (err) { setAuthError(TEXT.error_connection); } setLoading(false); };
+            const handleAuthAction = async (e) => { 
+                e.preventDefault(); 
+                if (!loginName.trim() || loginPin.length !== 4) { setAuthError(TEXT.error_fill); return; } 
+                setLoading(true); setAuthError(''); 
+                const username = loginName.toLowerCase().replace(/\s+/g, '_'); 
+                const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'habit_tracker_users', username); 
+                try { 
+                    const docSnap = await getDoc(userDocRef); 
+                    if (isRegistering) { 
+                        if (docSnap.exists()) { setAuthError(TEXT.error_taken); setLoading(false); return; } 
+                        await setDoc(userDocRef, { pin: loginPin, tasks: INITIAL_TASKS, isDarkMode: true, accentColor: '#f97316', createdAt: new Date().toISOString() }); 
+                        localStorage.setItem('focus_user_creds', JSON.stringify({ username, pin: loginPin })); 
+                        setAppUser({ username, pin: loginPin }); 
+                    } else { 
+                        if (docSnap.exists()) { 
+                            if (docSnap.data().pin === loginPin) { 
+                                localStorage.setItem('focus_user_creds', JSON.stringify({ username, pin: loginPin })); 
+                                setAppUser({ username, pin: loginPin }); 
+                            } else { 
+                                setAuthError(TEXT.error_pin); setLoading(false); return; } 
+                        } else { 
+                            setAuthError(TEXT.error_user_not_found); setLoading(false); return; } 
+                    } 
+                } catch (err) { setAuthError(TEXT.error_connection); } 
+                setLoading(false); 
+            };
+
             const handleLogout = () => { localStorage.removeItem('focus_user_creds'); setAppUser(null); setTasks(INITIAL_TASKS); setLoginName(''); setLoginPin(''); setIsRegistering(false); setIsDarkMode(true); };
             
             const moveTaskStatus = (taskId, currentStatus, direction) => {
-                playClickSound();
+                SoundEngine.playSwitch();
                 const statusOrder = ['Upcoming', 'Today', 'In Progress', 'Completed'];
                 const currentIndex = statusOrder.indexOf(currentStatus || 'Today');
                 const nextIndex = currentIndex + direction;
@@ -995,7 +1078,7 @@
                             spread: 70,
                             origin: { y: 0.6 }
                         });
-                        playSuccessSound();
+                        SoundEngine.playSuccess();
                     }
                 }
             };
@@ -1003,7 +1086,7 @@
             const addTask = (e) => { 
                 e.preventDefault(); 
                 if (!newTaskText.trim()) return; 
-                playClickSound();
+                SoundEngine.playAdd();
                 const newTask = { id: generateId(), text: newTaskText, status: 'Today', priority: 'Medium', createdAt: new Date().toISOString(), subtasks: [], categories: ['General'], deadline: '' }; 
                 setTasks(prev => {
                     const newTasks = [newTask, ...prev];
@@ -1094,12 +1177,12 @@
                 <style>{GLOBAL_STYLES}</style>
                 <div className={`p-8 rounded-[2rem] shadow-2xl w-full max-w-md border animate-spring relative`} style={theme.card}>
                     <div className="text-center mb-8"><h1 className="text-5xl font-black tracking-tighter mb-2" style={theme.textMain}>FOCUS</h1><p className={`text-sm`} style={theme.textSec}>{isRegistering ? TEXT.create_profile : TEXT.welcome}</p></div>
-                    <div className={`flex p-1 rounded-2xl mb-8`} style={theme.input}><button onClick={() => { playClickSound(); setIsRegistering(false); setAuthError(''); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all btn-press ${!isRegistering ? 'shadow-md' : 'opacity-60'}`} style={!isRegistering ? { backgroundColor: theme.card.backgroundColor, color: theme.textMain.color } : { color: theme.textSec.color }}>{TEXT.sign_in}</button><button onClick={() => { playClickSound(); setIsRegistering(true); setAuthError(''); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all btn-press ${isRegistering ? 'shadow-md' : 'opacity-60'}`} style={isRegistering ? { backgroundColor: theme.card.backgroundColor, color: theme.textMain.color } : { color: theme.textSec.color }}>{TEXT.create_account}</button></div>
+                    <div className={`flex p-1 rounded-2xl mb-8`} style={theme.input}><button onClick={() => { SoundEngine.playClick(); setIsRegistering(false); setAuthError(''); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all btn-press ${!isRegistering ? 'shadow-md' : 'opacity-60'}`} style={!isRegistering ? { backgroundColor: theme.card.backgroundColor, color: theme.textMain.color } : { color: theme.textSec.color }}>{TEXT.sign_in}</button><button onClick={() => { SoundEngine.playClick(); setIsRegistering(true); setAuthError(''); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all btn-press ${isRegistering ? 'shadow-md' : 'opacity-60'}`} style={isRegistering ? { backgroundColor: theme.card.backgroundColor, color: theme.textMain.color } : { color: theme.textSec.color }}>{TEXT.create_account}</button></div>
                     <form onSubmit={handleAuthAction} className="space-y-4">
                     <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}><label className={`block text-xs font-bold uppercase mb-2 ml-1`} style={theme.textSec}>{TEXT.username}</label><div className="relative"><User className="absolute left-4 top-3.5 w-5 h-5" style={theme.textSec} /><input type="text" value={loginName} onChange={(e) => setLoginName(e.target.value)} placeholder={TEXT.username_placeholder} className={`w-full pl-12 pr-4 py-3.5 rounded-2xl outline-none transition-all font-medium`} style={theme.input} autoFocus /></div></div>
                     <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}><label className={`block text-xs font-bold uppercase mb-2 ml-1`} style={theme.textSec}>{TEXT.pin}</label><div className="relative"><Lock className="absolute left-4 top-3.5 w-5 h-5" style={theme.textSec} /><input type="password" value={loginPin} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 4); setLoginPin(val); }} placeholder={TEXT.pin_placeholder} className={`w-full pl-12 pr-4 py-3.5 rounded-2xl outline-none transition-all font-bold tracking-widest`} style={theme.input} /></div></div>
                     {authError && (<div className="p-4 bg-red-500/10 text-red-500 text-sm rounded-2xl flex items-center gap-2 animate-spring font-bold"><div className="w-2 h-2 rounded-full bg-red-500" />{authError}</div>)}
-                    <button type="submit" onClick={playClickSound} className={`w-full font-bold py-4 rounded-2xl hover:opacity-90 btn-press transition-all shadow-lg mt-4 flex items-center justify-center gap-2 animate-slide-up`} style={theme.buttonPrimary}>{isRegistering ? <><UserPlus className="w-5 h-5"/> {TEXT.btn_create_profile}</> : <><LogIn className="w-5 h-5"/> {TEXT.btn_sign_in}</>}</button>
+                    <button type="submit" onClick={() => SoundEngine.playClick()} className={`w-full font-bold py-4 rounded-2xl hover:opacity-90 btn-press transition-all shadow-lg mt-4 flex items-center justify-center gap-2 animate-slide-up`} style={theme.buttonPrimary}>{isRegistering ? <><UserPlus className="w-5 h-5"/> {TEXT.btn_create_profile}</> : <><LogIn className="w-5 h-5"/> {TEXT.btn_sign_in}</>}</button>
                     </form>
                 </div>
                 </div>
@@ -1111,7 +1194,6 @@
                 <style>{GLOBAL_STYLES}</style>
                 <InstallModal isOpen={showInstallModal} onClose={() => setShowInstallModal(false)} theme={theme} text={TEXT} />
                 <ImagePreviewModal src={previewImage} isOpen={!!previewImage} onClose={() => setPreviewImage(null)} />
-                {/* REMOVED THE INPUT HERE */}
                 
                 {/* --- Task Detail Modal (Center Screen) --- */}
                 {activeModalTaskId && activeTask && (
@@ -1136,7 +1218,7 @@
                     </div>
                     
                     <div className="flex items-center gap-2 md:gap-3">
-                        <button onClick={() => { playClickSound(); setIsDarkMode(!isDarkMode); }} className="p-2 rounded-xl border hover:bg-black/5 transition-all" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>
+                        <button onClick={() => { SoundEngine.playClick(); setIsDarkMode(!isDarkMode); }} className="p-2 rounded-xl border hover:bg-black/5 transition-all" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>
                             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                         </button>
                         <div className="relative group hidden md:block">
@@ -1145,12 +1227,12 @@
                             </button>
                             <div className="absolute right-0 top-full mt-2 bg-white dark:bg-neutral-900 border p-2 rounded-2xl shadow-xl grid grid-cols-5 gap-1.5 w-48 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                                 {QUICK_COLORS.map(c => (
-                                    <button key={c} onClick={() => { playClickSound(); setAccentColor(c); }} className="w-8 h-8 rounded-full border shadow-sm hover:scale-110 transition-transform" style={{ backgroundColor: c, borderColor: theme.card.borderColor }} />
+                                    <button key={c} onClick={() => { SoundEngine.playClick(); setAccentColor(c); }} className="w-8 h-8 rounded-full border shadow-sm hover:scale-110 transition-transform" style={{ backgroundColor: c, borderColor: theme.card.borderColor }} />
                                 ))}
                             </div>
                         </div>
                         <div className="w-[1px] h-6 bg-gray-500/20 mx-1" />
-                        <button onClick={() => { playClickSound(); handleLogout(); }} className="p-2 rounded-xl hover:bg-red-500/10 text-red-500 transition-all" title={TEXT.sign_out}>
+                        <button onClick={() => { SoundEngine.playClick(); handleLogout(); }} className="p-2 rounded-xl hover:bg-red-500/10 text-red-500 transition-all" title={TEXT.sign_out}>
                             <LogOut className="w-5 h-5" />
                         </button>
                     </div>
@@ -1170,7 +1252,7 @@
                             return (
                                 <div 
                                     key={col.id} 
-                                    className={`snap-center w-[85vw] flex-shrink-0 md:w-auto h-full flex flex-col rounded-[2rem] border shadow-sm backdrop-blur-md transition-colors duration-300`} 
+                                    className={`snap-center w-[85vw] flex-shrink-0 md:w-auto h-full flex flex-col rounded-[2rem] border shadow-sm backdrop-blur-md transition-colors duration-300 min-h-0`} 
                                     style={theme.column}
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, col.id)}
@@ -1185,7 +1267,7 @@
                                             <span className={`text-xs font-bold px-2.5 py-1 rounded-lg opacity-50`} style={{ backgroundColor: theme.input.backgroundColor, color: theme.textMain.color }}>{colTasks.length}</span>
                                         </div>
                                         {col.id === 'Today' && (
-                                            <button onClick={() => { if(newTaskText.trim()) { playClickSound(); addTask({ preventDefault: () => {} }); } }} className="p-2 rounded-full hover:bg-black/5 transition-colors" title="Quick Add"><Plus className="w-5 h-5" style={theme.textSec} /></button>
+                                            <button onClick={() => { if(newTaskText.trim()) { SoundEngine.playClick(); addTask({ preventDefault: () => {} }); } }} className="p-2 rounded-full hover:bg-black/5 transition-colors" title="Quick Add"><Plus className="w-5 h-5" style={theme.textSec} /></button>
                                         )}
                                     </div>
 
@@ -1206,102 +1288,102 @@
                                     )}
 
                                     {/* Task List */}
-                                    <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar">
-                                        {colTasks.map((task, index) => {
-                                            const subtaskCount = task.subtasks ? task.subtasks.length : 0;
-                                            const subtaskCompleted = task.subtasks ? task.subtasks.filter(st => st.completed).length : 0;
-                                            const progress = subtaskCount > 0 ? (subtaskCompleted / subtaskCount) * 100 : 0;
-                                            const isOverdue = task.deadline && new Date(task.deadline) < new Date(new Date().setHours(0,0,0,0));
+                                    <div className="flex-1 overflow-y-auto px-4 pb-24 md:pb-4 space-y-3 custom-scrollbar min-h-0">
+                                            {colTasks.map((task, index) => {
+                                                const subtaskCount = task.subtasks ? task.subtasks.length : 0;
+                                                const subtaskCompleted = task.subtasks ? task.subtasks.filter(st => st.completed).length : 0;
+                                                const progress = subtaskCount > 0 ? (subtaskCompleted / subtaskCount) * 100 : 0;
+                                                const isOverdue = task.deadline && new Date(task.deadline) < new Date(new Date().setHours(0,0,0,0));
 
-                                            return (
-                                                <div 
-                                                    key={task.id}
-                                                    draggable="true"
-                                                    onDragStart={(e) => handleDragStart(e, task.id)}
-                                                    className={`rounded-2xl p-4 shadow-sm border relative transition-all cursor-grab active:cursor-grabbing animate-slide-up group hover:shadow-md hover:scale-[1.01]`}
-                                                    style={{ backgroundColor: theme.card.backgroundColor, borderColor: theme.card.borderColor, animationDelay: `${index * 0.05}s` }}
-                                                    onClick={() => { playClickSound(); setActiveModalTaskId(task.id); }}
-                                                >
-                                                    {/* Navigation Controls */}
-                                                    <div className="absolute top-4 right-4 flex gap-1 z-10">
-                                                        {/* Backward Button (Hidden for Upcoming) */}
-                                                        {task.status !== 'Upcoming' && (
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); moveTaskStatus(task.id, task.status, -1); }}
-                                                                className="p-1.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
-                                                                title="Previous Status"
-                                                            >
-                                                                <ArrowLeft className="w-4 h-4" style={{ color: theme.textSec.color }} />
-                                                            </button>
-                                                        )}
-                                                        
-                                                        {/* Forward Button (Hidden for Completed) */}
-                                                        {task.status !== 'Completed' && (
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); moveTaskStatus(task.id, task.status, 1); }}
-                                                                className={`p-1.5 rounded-full transition-colors ${task.status === 'In Progress' ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/30' : 'bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20'}`}
-                                                                title={task.status === 'In Progress' ? 'Finish Task' : 'Next Status'}
-                                                            >
-                                                                {task.status === 'In Progress' ? (
-                                                                    <Check className="w-4 h-4" />
-                                                                ) : (
-                                                                    <ArrowRight className="w-4 h-4" style={{ color: theme.textSec.color }} />
-                                                                )}
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="flex justify-between items-start mb-2 pr-20">
-                                                        <div className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider mb-1 inline-block border ${task.priority === 'High' ? 'bg-red-500/10 text-red-500 border-red-500/20' : task.priority === 'Medium' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
-                                                            {task.priority}
+                                                return (
+                                                    <div 
+                                                        key={task.id}
+                                                        draggable="true"
+                                                        onDragStart={(e) => handleDragStart(e, task.id)}
+                                                        className={`rounded-2xl p-4 shadow-sm border relative transition-all cursor-grab active:cursor-grabbing animate-slide-up group hover:shadow-md hover:scale-[1.01]`}
+                                                        style={{ backgroundColor: theme.card.backgroundColor, borderColor: theme.card.borderColor, animationDelay: `${index * 0.05}s` }}
+                                                        onClick={() => { SoundEngine.playClick(); setActiveModalTaskId(task.id); }}
+                                                    >
+                                                        {/* Navigation Controls */}
+                                                        <div className="absolute top-4 right-4 flex gap-1 z-10">
+                                                            {/* Backward Button (Hidden for Upcoming) */}
+                                                            {task.status !== 'Upcoming' && (
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); moveTaskStatus(task.id, task.status, -1); }}
+                                                                    className="p-1.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                                                                    title="Previous Status"
+                                                                >
+                                                                    <ArrowLeft className="w-4 h-4" style={{ color: theme.textSec.color }} />
+                                                                </button>
+                                                            )}
+                                                            
+                                                            {/* Forward Button (Hidden for Completed) */}
+                                                            {task.status !== 'Completed' && (
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); moveTaskStatus(task.id, task.status, 1); }}
+                                                                    className={`p-1.5 rounded-full transition-colors ${task.status === 'In Progress' ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/30' : 'bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20'}`}
+                                                                    title={task.status === 'In Progress' ? 'Finish Task' : 'Next Status'}
+                                                                >
+                                                                    {task.status === 'In Progress' ? (
+                                                                        <Check className="w-4 h-4" />
+                                                                    ) : (
+                                                                        <ArrowRight className="w-4 h-4" style={{ color: theme.textSec.color }} />
+                                                                    )}
+                                                                </button>
+                                                            )}
                                                         </div>
-                                                        {task.deadline && (
-                                                            <div className={`text-[10px] font-bold flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-gray-400'}`}>
-                                                                <Clock className="w-3 h-3" /> {new Date(task.deadline).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    
-                                                    <div className={`font-bold text-base mb-3 leading-snug line-clamp-2`} style={theme.textMain}>{task.text}</div>
 
-                                                    <div className="flex items-center justify-between mt-auto">
-                                                        <div className="flex items-center gap-2">
-                                                            {subtaskCount > 0 && (
-                                                                <div className="flex items-center gap-1 text-xs font-bold" style={{ color: progress === 100 ? '#10b981' : theme.textSec.color }}>
-                                                                    <CheckCircle2 className="w-3.5 h-3.5" /> {subtaskCompleted}/{subtaskCount}
+                                                        <div className="flex justify-between items-start mb-2 pr-20">
+                                                            <div className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider mb-1 inline-block border ${task.priority === 'High' ? 'bg-red-500/10 text-red-500 border-red-500/20' : task.priority === 'Medium' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
+                                                                {task.priority}
+                                                            </div>
+                                                            {task.deadline && (
+                                                                <div className={`text-[10px] font-bold flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-gray-400'}`}>
+                                                                    <Clock className="w-3 h-3" /> {new Date(task.deadline).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border opacity-0 group-hover:opacity-100 transition-opacity`} style={{ borderColor: theme.card.borderColor }}>
-                                                            <Maximize2 className="w-3 h-3" style={theme.textSec} />
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    {/* TAGS ON CARD - Modified to wrap and show all tags */}
-                                                    {task.categories?.length > 0 && (
-                                                        <div className="flex flex-wrap gap-1 mt-3">
-                                                            {task.categories.map(cat => (
-                                                                <div key={cat} className="flex items-center gap-1 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>
-                                                                    <Tag className="w-3 h-3" /> {cat} 
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
+                                                        
+                                                        <div className={`font-bold text-base mb-3 leading-snug line-clamp-2`} style={theme.textMain}>{task.text}</div>
 
-                                                    {subtaskCount > 0 && (
-                                                        <div className="h-1 w-full bg-gray-200/50 dark:bg-gray-700/50 rounded-full mt-3 overflow-hidden">
-                                                            <div className="h-full transition-all duration-500 rounded-full" style={{ width: `${progress}%`, backgroundColor: theme.accent }}></div>
+                                                        <div className="flex items-center justify-between mt-auto">
+                                                            <div className="flex items-center gap-2">
+                                                                {subtaskCount > 0 && (
+                                                                    <div className="flex items-center gap-1 text-xs font-bold" style={{ color: progress === 100 ? '#10b981' : theme.textSec.color }}>
+                                                                        <CheckCircle2 className="w-3.5 h-3.5" /> {subtaskCompleted}/{subtaskCount}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border opacity-0 group-hover:opacity-100 transition-opacity`} style={{ borderColor: theme.card.borderColor }}>
+                                                                <Maximize2 className="w-3 h-3" style={theme.textSec} />
+                                                            </div>
                                                         </div>
-                                                    )}
+                                                        
+                                                        {/* TAGS ON CARD - Modified to wrap and show all tags */}
+                                                        {task.categories?.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-3">
+                                                                {task.categories.map(cat => (
+                                                                    <div key={cat} className="flex items-center gap-1 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>
+                                                                        <Tag className="w-3 h-3" /> {cat} 
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {subtaskCount > 0 && (
+                                                            <div className="h-1 w-full bg-gray-200/50 dark:bg-gray-700/50 rounded-full mt-3 overflow-hidden">
+                                                                <div className="h-full transition-all duration-500 rounded-full" style={{ width: `${progress}%`, backgroundColor: theme.accent }}></div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                            {colTasks.length === 0 && (
+                                                <div className="h-32 border-2 border-dashed rounded-3xl flex flex-col gap-2 items-center justify-center text-sm font-bold opacity-30 select-none" style={{ borderColor: theme.isDark ? '#333' : '#ddd', color: theme.textSec.color }}>
+                                                    <div className="p-3 rounded-full bg-gray-500/10"><Icon className="w-6 h-6" /></div>
+                                                    No tasks
                                                 </div>
-                                            );
-                                        })}
-                                        {colTasks.length === 0 && (
-                                            <div className="h-32 border-2 border-dashed rounded-3xl flex flex-col gap-2 items-center justify-center text-sm font-bold opacity-30 select-none" style={{ borderColor: theme.isDark ? '#333' : '#ddd', color: theme.textSec.color }}>
-                                                <div className="p-3 rounded-full bg-gray-500/10"><Icon className="w-6 h-6" /></div>
-                                                No tasks
-                                            </div>
-                                        )}
+                                            )}
                                     </div>
                                 </div>
                             )
@@ -1310,7 +1392,7 @@
                     {/* Bottom Navigation for Mobile */}
                     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-full flex gap-4 shadow-2xl border border-white/10 md:hidden">
                        {COLUMNS.map((col, idx) => (
-                           <button key={col.id} onClick={() => { playClickSound(); scrollToColumn(idx); }} className={`p-2 rounded-full transition-all ${activeColId === col.id ? 'bg-white/20' : 'text-gray-400'}`} style={activeColId === col.id ? { color: theme.accent } : {}}>
+                           <button key={col.id} onClick={() => { SoundEngine.playClick(); scrollToColumn(idx); }} className={`p-2 rounded-full transition-all ${activeColId === col.id ? 'bg-white/20' : 'text-gray-400'}`} style={activeColId === col.id ? { color: theme.accent } : {}}>
                               <col.icon className="w-5 h-5" />
                            </button>
                        ))}
