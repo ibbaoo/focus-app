@@ -178,46 +178,80 @@
 
         const usePWAInjection = () => {
             useEffect(() => {
-                // Read the icon from the HTML head to ensure consistency
-                const existingIcon = document.querySelector('link[rel="icon"]');
-                const iconSvg = existingIcon ? existingIcon.href : `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23f97316;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23db2777;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23grad)'/%3E%3Cpath d='M368 176L214.3 336 144 263' stroke='white' stroke-width='48' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E`;
-                
-                const updateLink = (rel, href) => {
-                    let link = document.querySelector(`link[rel="${rel}"]`);
-                    if (!link) {
-                        link = document.createElement('link');
-                        link.rel = rel;
-                        document.head.appendChild(link);
-                    }
-                    link.href = href;
+                // Helper to create a PNG blob from the SVG
+                const createPngIcon = (svgDataUri, size) => {
+                    return new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = size;
+                            canvas.height = size;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, size, size);
+                            canvas.toBlob((blob) => {
+                                resolve(URL.createObjectURL(blob));
+                            }, 'image/png');
+                        };
+                        img.src = svgDataUri;
+                    });
                 };
 
-                // Sync other icon types with the main icon
-                updateLink('shortcut icon', iconSvg);
-                updateLink('apple-touch-icon', iconSvg);
+                const setupPWA = async () => {
+                    const iconSvg = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23f97316;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23db2777;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23grad)'/%3E%3Cpath d='M368 176L214.3 336 144 263' stroke='white' stroke-width='48' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E`;
+                    
+                    // Create PNG versions for better compatibility (Windows Taskbar/Desktop)
+                    const iconPng192 = await createPngIcon(iconSvg, 192);
+                    const iconPng512 = await createPngIcon(iconSvg, 512);
 
-                const manifest = {
-                    "name": "FOCUS",
-                    "short_name": "FOCUS",
-                    "start_url": ".",
-                    "display": "standalone",
-                    "background_color": "#000000",
-                    "theme_color": "#000000",
-                    "icons": [
-                        { 
-                            "src": iconSvg, 
-                            "sizes": "192x192 512x512", 
-                            "type": "image/svg+xml",
-                            "purpose": "any" 
+                    const updateLink = (rel, href) => {
+                        let link = document.querySelector(`link[rel="${rel}"]`);
+                        if (!link) {
+                            link = document.createElement('link');
+                            link.rel = rel;
+                            document.head.appendChild(link);
                         }
-                    ]
-                };
-                const stringManifest = JSON.stringify(manifest);
-                const blob = new Blob([stringManifest], {type: 'application/json'});
-                const manifestURL = URL.createObjectURL(blob);
-                updateLink('manifest', manifestURL);
+                        link.href = href;
+                    };
 
-                return () => URL.revokeObjectURL(manifestURL);
+                    updateLink('icon', iconSvg);
+                    updateLink('shortcut icon', iconSvg);
+                    updateLink('apple-touch-icon', iconSvg);
+
+                    const manifest = {
+                        "name": "FOCUS",
+                        "short_name": "FOCUS",
+                        "start_url": ".",
+                        "display": "standalone",
+                        "background_color": "#000000",
+                        "theme_color": "#000000",
+                        "icons": [
+                            { 
+                                "src": iconSvg, 
+                                "sizes": "any", 
+                                "type": "image/svg+xml",
+                                "purpose": "any" 
+                            },
+                            {
+                                "src": iconPng192,
+                                "sizes": "192x192",
+                                "type": "image/png",
+                                "purpose": "any"
+                            },
+                            {
+                                "src": iconPng512,
+                                "sizes": "512x512",
+                                "type": "image/png",
+                                "purpose": "any"
+                            }
+                        ]
+                    };
+                    const stringManifest = JSON.stringify(manifest);
+                    const blob = new Blob([stringManifest], {type: 'application/json'});
+                    const manifestURL = URL.createObjectURL(blob);
+                    updateLink('manifest', manifestURL);
+                };
+
+                setupPWA();
             }, []);
         };
 
