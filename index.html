@@ -26,7 +26,7 @@
 
     <script type="text/babel" data-type="module">
         // --- Imports from CDN ---
-        import React, { useState, useEffect, useRef, useCallback } from 'https://esm.sh/react@18.2.0';
+        import React, { useState, useEffect, useRef, useCallback, useMemo } from 'https://esm.sh/react@18.2.0';
         import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
         import confetti from 'https://esm.sh/canvas-confetti@1.6.0';
         
@@ -37,7 +37,8 @@
             GripVertical, ChevronDown, ChevronUp, Paperclip, FolderPlus, Tag, Sticker, 
             Moon, Sun, Palette, Layout, Clock, CheckCircle2, CircleDashed, ArrowRightCircle, 
             Maximize2, RotateCw, ArrowUp, ArrowDown, Smartphone, Calendar, AlertTriangle,
-            Edit3, Link as LinkIcon, ExternalLink, Save, Eye, ChevronRight, ArrowRight, ArrowLeft
+            Edit3, Link as LinkIcon, ExternalLink, Save, Eye, ChevronRight, ArrowRight, ArrowLeft,
+            DollarSign, TrendingUp
         } from 'https://esm.sh/lucide-react@0.292.0';
 
         // Firebase
@@ -277,6 +278,11 @@
             return `${year}-${month}-${day}`;
         };
 
+        // Format Currency
+        const formatCurrency = (amount) => {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount || 0);
+        };
+
         const hexToRgb = (hex) => {
             const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
             hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
@@ -404,6 +410,45 @@
             ) 
         };
 
+        const RevenueModal = ({ isOpen, onClose, theme, revenueHistory }) => {
+            if (!isOpen) return null;
+            
+            const totalLifetime = revenueHistory.reduce((acc, curr) => acc + curr.amount, 0);
+
+            return (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity duration-300" onClick={onClose}>
+                    <div className="w-full max-w-md rounded-[2rem] p-6 shadow-2xl animate-spring" style={theme.card} onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-black flex items-center gap-2" style={theme.textMain}>
+                                <div className="p-2 rounded-xl bg-green-500/10 text-green-500"><TrendingUp className="w-5 h-5" /></div>
+                                Revenue
+                            </h3>
+                            <button onClick={onClose} className="p-2 rounded-full hover:bg-black/5" style={{ color: theme.textSec.color }}><X className="w-5 h-5" /></button>
+                        </div>
+
+                        <div className="mb-8 text-center p-6 rounded-3xl border bg-gradient-to-br from-green-500/10 to-transparent" style={{ borderColor: theme.card.borderColor }}>
+                            <span className="text-xs font-bold uppercase tracking-widest opacity-60" style={theme.textSec}>Lifetime Earnings</span>
+                            <div className="text-4xl font-black mt-2 text-green-500">{formatCurrency(totalLifetime)}</div>
+                        </div>
+
+                        <div className="space-y-3 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
+                            <h4 className="text-xs font-bold uppercase opacity-50 mb-4" style={theme.textSec}>Monthly Breakdown</h4>
+                            {revenueHistory.length === 0 ? (
+                                <div className="text-center py-8 opacity-40 text-sm italic">No completed tasks with revenue yet.</div>
+                            ) : (
+                                revenueHistory.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center p-4 rounded-2xl border transition-all hover:bg-black/5" style={{ backgroundColor: theme.appContainer.backgroundColor, borderColor: theme.card.borderColor }}>
+                                        <div className="font-bold text-sm" style={theme.textMain}>{item.month}</div>
+                                        <div className="font-mono font-bold text-green-500">{formatCurrency(item.amount)}</div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- Task Modal Component (View/Edit Modes) ---
         const TaskModal = ({ task, onClose, onUpdate, onDelete, theme }) => {
             const [mode, setMode] = useState('view'); // 'view' | 'edit'
@@ -512,12 +557,33 @@
                                 </div>
                             </div>
 
+                            {/* Revenue Input */}
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 text-sm font-medium flex-1" style={theme.textSec}>
+                                    <div className="p-1.5 rounded-lg bg-green-500/10 text-green-500"><DollarSign className="w-4 h-4" /></div>
+                                    {mode === 'edit' ? (
+                                        <input 
+                                            type="number" 
+                                            placeholder="Revenue (e.g. 500)"
+                                            value={task.revenue || ''} 
+                                            onChange={(e) => onUpdate({ revenue: parseFloat(e.target.value) || 0 })} 
+                                            className="bg-transparent outline-none w-full" 
+                                            style={{ color: theme.textMain.color }} 
+                                        />
+                                    ) : (
+                                        <span className={task.revenue ? "font-bold text-green-500" : "opacity-50"}>
+                                            {task.revenue ? formatCurrency(task.revenue) : 'No Revenue Set'}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Deadline */}
                             <div className="flex items-center gap-2">
                                 <div className="flex items-center gap-2 text-sm font-medium flex-1" style={theme.textSec}>
-                                    <Calendar className="w-4 h-4" />
+                                    <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500"><Calendar className="w-4 h-4" /></div>
                                     {mode === 'edit' ? (
-                                        <input type="date" value={task.deadline || ''} onChange={(e) => onUpdate({ deadline: e.target.value })} className="bg-transparent outline-none cursor-pointer" style={{ color: theme.textMain.color }} />
+                                        <input type="date" value={task.deadline || ''} onChange={(e) => onUpdate({ deadline: e.target.value })} className="bg-transparent outline-none cursor-pointer w-full" style={{ color: theme.textMain.color }} />
                                     ) : (
                                         <span style={{ color: theme.textMain.color }}>{task.deadline ? new Date(task.deadline).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : 'No Deadline'}</span>
                                     )}
@@ -799,6 +865,8 @@
             const [accentColor, setAccentColor] = useState('#f97316'); 
             const [activeColId, setActiveColId] = useState('Today');
             
+            const [showRevenueModal, setShowRevenueModal] = useState(false);
+
             const scrollContainerRef = useRef(null);
             
             // Ref for debouncing saves
@@ -823,6 +891,46 @@
             
             const [loginName, setLoginName] = useState('');
             const [loginPin, setLoginPin] = useState('');
+
+            // --- Derived Revenue Data ---
+            const { currentMonthRevenue, revenueHistory } = useMemo(() => {
+                const now = new Date();
+                const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                
+                let currentTotal = 0;
+                const historyMap = {};
+
+                tasks.forEach(t => {
+                    if (t.status === 'Completed' && t.revenue) {
+                        // Use task completion date if available, else creation date, else now
+                        // Simple approach: Use a 'completedAt' timestamp if we had one, 
+                        // but for now let's assume revenue counts for the month the task was created or just group all completed tasks.
+                        // Better: Group by actual completion month? 
+                        // Since we don't track 'completedAt' strictly, let's group by 'createdAt' for simplicity OR just group everything by month.
+                        // Let's assume we want to track when the money was "earned" (Completed).
+                        // Since we don't strictly save 'completedAt', we will fallback to createdAt for history grouping,
+                        // BUT for the "Current Month" preview, we check if the task is completed and belongs to this month.
+                        
+                        const date = new Date(t.createdAt); 
+                        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                        const monthName = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+
+                        if (key === currentMonthKey) {
+                            currentTotal += t.revenue;
+                        }
+
+                        if (!historyMap[key]) {
+                            historyMap[key] = { month: monthName, amount: 0, sortKey: key };
+                        }
+                        historyMap[key].amount += t.revenue;
+                    }
+                });
+
+                const history = Object.values(historyMap).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+
+                return { currentMonthRevenue: currentTotal, revenueHistory: history };
+            }, [tasks]);
+
 
             // --- Auth & Data Loading ---
             useEffect(() => { 
@@ -994,7 +1102,6 @@
                             spread: 70,
                             origin: { y: 0.6 }
                         });
-                        SoundEngine.playCompletionSound();
                     }
                 }
             };
@@ -1002,7 +1109,7 @@
             const addTask = (e) => { 
                 e.preventDefault(); 
                 if (!newTaskText.trim()) return; 
-                const newTask = { id: generateId(), text: newTaskText, status: 'Today', priority: 'Medium', createdAt: new Date().toISOString(), subtasks: [], categories: ['General'], deadline: '' }; 
+                const newTask = { id: generateId(), text: newTaskText, status: 'Today', priority: 'Medium', createdAt: new Date().toISOString(), subtasks: [], categories: ['General'], deadline: '', revenue: 0 }; 
                 setTasks(prev => {
                     const newTasks = [newTask, ...prev];
                     saveToFirestore(newTasks); // Instant Save
@@ -1017,7 +1124,7 @@
                     const newTasks = prev.map(t => t.id === taskId ? { ...t, ...updates } : t);
                     
                     // If updating text fields, debounce. Else save instantly.
-                    if (updates.text !== undefined || updates.description !== undefined) {
+                    if (updates.text !== undefined || updates.description !== undefined || updates.revenue !== undefined) {
                         saveToFirestoreDebounced(newTasks);
                     } else {
                         saveToFirestore(newTasks);
@@ -1109,6 +1216,12 @@
                 <style>{GLOBAL_STYLES}</style>
                 <InstallModal isOpen={showInstallModal} onClose={() => setShowInstallModal(false)} theme={theme} text={TEXT} />
                 <ImagePreviewModal src={previewImage} isOpen={!!previewImage} onClose={() => setPreviewImage(null)} />
+                <RevenueModal 
+                    isOpen={showRevenueModal} 
+                    onClose={() => setShowRevenueModal(false)} 
+                    theme={theme}
+                    revenueHistory={revenueHistory}
+                />
                 
                 {/* --- Task Detail Modal (Center Screen) --- */}
                 {activeModalTaskId && activeTask && (
@@ -1133,6 +1246,15 @@
                     </div>
                     
                     <div className="flex items-center gap-2 md:gap-3">
+                        {/* Revenue Island */}
+                        <button onClick={() => setShowRevenueModal(true)} className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl border hover:bg-black/5 transition-all group" style={{ borderColor: theme.card.borderColor }}>
+                            <div className="p-1 rounded-full bg-green-500/10 text-green-500 group-hover:scale-110 transition-transform"><DollarSign className="w-4 h-4" /></div>
+                            <div className="flex flex-col items-start leading-none">
+                                <span className="text-[10px] font-bold uppercase opacity-50" style={theme.textSec}>This Month</span>
+                                <span className="text-sm font-black" style={theme.textMain}>{formatCurrency(currentMonthRevenue)}</span>
+                            </div>
+                        </button>
+
                         <button onClick={() => { setIsDarkMode(!isDarkMode); }} className="p-2 rounded-xl border hover:bg-black/5 transition-all" style={{ borderColor: theme.card.borderColor, color: theme.textSec.color }}>
                             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                         </button>
@@ -1159,7 +1281,7 @@
                     {/* Mobile: Horizontal Scroll Snap
                         Desktop: Grid Layout (Full width, no horizontal scroll)
                     */}
-                    <div ref={scrollContainerRef} className={`flex-1 w-full flex md:grid md:grid-cols-4 gap-4 md:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory pb-4`}>
+                    <div ref={scrollContainerRef} className={`flex-1 w-full flex md:grid md:grid-cols-4 gap-4 md:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory pb-4 min-h-0`}>
                         {COLUMNS.map(col => {
                             const colTasks = tasks.filter(t => (t.status || 'Today') === col.id).sort((a,b) => getPriorityWeight(b.priority) - getPriorityWeight(a.priority));
                             const Icon = col.icon;
@@ -1203,7 +1325,7 @@
                                     )}
 
                                     {/* Task List */}
-                                    <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar min-h-0">
+                                    <div className="flex-1 overflow-y-auto px-4 pb-24 md:pb-4 space-y-3 custom-scrollbar min-h-0">
                                             {colTasks.map((task, index) => {
                                                 const subtaskCount = task.subtasks ? task.subtasks.length : 0;
                                                 const subtaskCompleted = task.subtasks ? task.subtasks.filter(st => st.completed).length : 0;
@@ -1261,6 +1383,13 @@
                                                         
                                                         <div className={`font-bold text-base mb-3 leading-snug line-clamp-2`} style={theme.textMain}>{task.text}</div>
 
+                                                        {/* Revenue Badge on Card */}
+                                                        {task.revenue > 0 && (
+                                                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold mb-3">
+                                                                <DollarSign className="w-3 h-3" /> {formatCurrency(task.revenue)}
+                                                            </div>
+                                                        )}
+
                                                         <div className="flex items-center justify-between mt-auto">
                                                             <div className="flex items-center gap-2">
                                                                 {subtaskCount > 0 && (
@@ -1311,6 +1440,10 @@
                             <col.icon className="w-5 h-5" />
                         </button>
                     ))}
+                    {/* Mobile Revenue Button */}
+                    <button onClick={() => setShowRevenueModal(true)} className={`p-2 rounded-full transition-all text-green-500 bg-white/10`}>
+                        <DollarSign className="w-5 h-5" />
+                    </button>
                     </div>
                 </div>
             </div>
