@@ -724,7 +724,15 @@
                                                     className="bg-transparent text-xs font-bold outline-none cursor-pointer"
                                                     style={{ color: theme.accent }}
                                                 >
-                                                    {(task.categories || ['General']).map(c => <option key={c} value={c}>{c}</option>)}
+                                                    {(task.categories || ['General']).map(c => (
+                                                        <option 
+                                                            key={c} 
+                                                            value={c} 
+                                                            style={{ backgroundColor: theme.card.backgroundColor, color: theme.textMain.color }}
+                                                        >
+                                                            {c}
+                                                        </option>
+                                                    ))}
                                                 </select>
                                             </div>
                                         </div>
@@ -795,7 +803,15 @@
                                                     className="bg-transparent text-xs font-bold outline-none cursor-pointer"
                                                     style={{ color: theme.accent }}
                                                 >
-                                                    {(task.categories || ['General']).map(c => <option key={c} value={c}>{c}</option>)}
+                                                    {(task.categories || ['General']).map(c => (
+                                                        <option 
+                                                            key={c} 
+                                                            value={c}
+                                                            style={{ backgroundColor: theme.card.backgroundColor, color: theme.textMain.color }}
+                                                        >
+                                                            {c}
+                                                        </option>
+                                                    ))}
                                                 </select>
                                             </div>
                                             <div className="flex items-center gap-2 mt-2">
